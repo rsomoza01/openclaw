@@ -1,5 +1,17 @@
 #!/usr/bin/env node
 import process from "node:process";
+
+// --- FORZADO AGRESIVO ---
+// Esto sobrescribe cualquier configuración interna que busque estas variables
+process.env.PORT = "3000";
+process.env.OPENCLAW_PORT = "3000"; // Algunos sistemas usan prefijos
+process.env.HOST = "0.0.0.0";
+process.env.OPENCLAW_HOST = "0.0.0.0";
+
+// También modificamos los argumentos por si acaso
+process.argv.push("--port", "3000", "--host", "0.0.0.0");
+// ------------------------
+
 import { fileURLToPath } from "node:url";
 
 // --- BLOQUE DE FORZADO DE PUERTO PARA RENDER ---
