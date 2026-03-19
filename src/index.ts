@@ -1,5 +1,21 @@
 #!/usr/bin/env node
 import process from "node:process";
+
+// --- LIMPIEZA TOTAL DE ARGUMENTOS ---
+// Borramos cualquier rastro de configuración previa y forzamos el Host Global
+process.env.HOST = "0.0.0.0";
+process.env.PORT = "3000";
+
+// Reemplazamos los argumentos del proceso para que OpenClaw solo vea estos
+process.argv = [
+  process.argv[0], 
+  process.argv[1], 
+  "--host", "0.0.0.0", 
+  "--port", "3000"
+];
+// ------------------------------------
+
+import { fileURLToPath } from "node:url";
 import net from "node:net"; // <--- Añade este import
 
 // --- EL TRUCO FINAL PARA RENDER ---
@@ -11,14 +27,6 @@ net.Server.prototype.listen = function(...args: any[]) {
   }
   return originalListen.apply(this, args);
 };
-
-// Forzamos las variables de entorno
-process.env.HOST = "0.0.0.0";
-process.env.PORT = "3000";
-// ----------------------------------
-
-import { fileURLToPath } from "node:url";
-
 
 // --- FORZADO AGRESIVO ---
 // Esto sobrescribe cualquier configuración interna que busque estas variables
