@@ -1,18 +1,33 @@
 #!/usr/bin/env node
 import process from "node:process";
+import net from "node:net"; // <--- Añade este import
+
+// --- EL TRUCO FINAL PARA RENDER ---
+// Forzamos a que cualquier intento de escuchar en '127.0.0.1' se convierta en '0.0.0.0'
+const originalListen = net.Server.prototype.listen;
+net.Server.prototype.listen = function(...args: any[]) {
+  if (typeof args[1] === 'string' && (args[1] === '127.0.0.1' || args[1] === 'localhost')) {
+    args[1] = '0.0.0.0';
+  }
+  return originalListen.apply(this, args);
+};
+
+// Forzamos las variables de entorno
+process.env.HOST = "0.0.0.0";
+process.env.PORT = "3000";
+// ----------------------------------
+
+import { fileURLToPath } from "node:url";
+
 
 // --- FORZADO AGRESIVO ---
 // Esto sobrescribe cualquier configuración interna que busque estas variables
-process.env.PORT = "3000";
 process.env.OPENCLAW_PORT = "3000"; // Algunos sistemas usan prefijos
-process.env.HOST = "0.0.0.0";
 process.env.OPENCLAW_HOST = "0.0.0.0";
 
 // También modificamos los argumentos por si acaso
 process.argv.push("--port", "3000", "--host", "0.0.0.0");
 // ------------------------
-
-import { fileURLToPath } from "node:url";
 
 // --- BLOQUE DE FORZADO DE PUERTO PARA RENDER ---
 const RENDER_PORT = process.env.PORT || "3000";
