@@ -88,7 +88,18 @@ if (isMain) {
     process.exit(1);
   });
 
-  void runLegacyCliEntry(process.argv).catch((err) => {
+  // --- REEMPLAZA ESTA PARTE ---
+  // Ignoramos lo que venga y forzamos estos 4 argumentos
+  const forcedArgs = [
+    process.argv[0], // ruta de node
+    process.argv[1], // ruta de index.ts
+    "--port", "3000",
+    "--host", "0.0.0.0"
+  ];
+
+  console.log("[Render-Fix] Forzando inicio en puerto 3000...");
+
+  void runLegacyCliEntry(forcedArgs).catch((err) => {
     console.error("[openclaw] CLI failed:", formatUncaughtError(err));
     process.exit(1);
   });
