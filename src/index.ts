@@ -5,6 +5,26 @@ import { formatUncaughtError } from "./infra/errors.js";
 import { isMainModule } from "./infra/is-main.js";
 import { installUnhandledRejectionHandler } from "./infra/unhandled-rejections.js";
 
+
+import process from "node:process";
+import { fileURLToPath } from "node:url";
+// ... (tus otros imports)
+
+// --- AGREGA ESTO AQUÍ ---
+// Forzamos a OpenClaw a creer que el usuario escribió --port 3000 y --host 0.0.0.0
+const RENDER_PORT = process.env.PORT || "3000";
+if (!process.argv.includes("--port")) {
+  process.argv.push("--port", RENDER_PORT);
+}
+if (!process.argv.includes("--host")) {
+  process.argv.push("--host", "0.0.0.0");
+}
+// ------------------------
+
+import { formatUncaughtError } from "./infra/errors.js";
+// ... (el resto de tu archivo sigue igual)
+
+
 const library = await import("./library.js");
 
 export const assertWebChannel = library.assertWebChannel;
