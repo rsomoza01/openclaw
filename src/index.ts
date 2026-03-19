@@ -1,17 +1,8 @@
 #!/usr/bin/env node
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { formatUncaughtError } from "./infra/errors.js";
-import { isMainModule } from "./infra/is-main.js";
-import { installUnhandledRejectionHandler } from "./infra/unhandled-rejections.js";
 
-
-import process from "node:process";
-import { fileURLToPath } from "node:url";
-// ... (tus otros imports)
-
-// --- AGREGA ESTO AQUÍ ---
-// Forzamos a OpenClaw a creer que el usuario escribió --port 3000 y --host 0.0.0.0
+// --- BLOQUE DE FORZADO DE PUERTO PARA RENDER ---
 const RENDER_PORT = process.env.PORT || "3000";
 if (!process.argv.includes("--port")) {
   process.argv.push("--port", RENDER_PORT);
@@ -19,11 +10,11 @@ if (!process.argv.includes("--port")) {
 if (!process.argv.includes("--host")) {
   process.argv.push("--host", "0.0.0.0");
 }
-// ------------------------
+// -----------------------------------------------
 
 import { formatUncaughtError } from "./infra/errors.js";
-// ... (el resto de tu archivo sigue igual)
-
+import { isMainModule } from "./infra/is-main.js";
+import { installUnhandledRejectionHandler } from "./infra/unhandled-rejections.js";
 
 const library = await import("./library.js");
 
@@ -63,12 +54,12 @@ async function loadLegacyCliDeps(): Promise<LegacyCliDeps> {
   return { installGaxiosFetchCompat, runCli };
 }
 
-// Legacy direct file entrypoint only. Package root exports now live in library.ts.
 export async function runLegacyCliEntry(
   argv: string[] = process.argv,
   deps?: LegacyCliDeps,
 ): Promise<void> {
   const { installGaxiosFetchCompat, runCli } = deps ?? (await loadLegacyCliDeps());
+  await installGcaughtException(); // Si tenías esto, déjalo
   await installGaxiosFetchCompat();
   await runCli(argv);
 }
@@ -85,22 +76,8 @@ if (isMain) {
     process.exit(1);
   });
 
-  // --- CAMBIO AQUÍ ---
-  // Forzamos que los argumentos incluyan el puerto de Render si existe
-  const renderPort = process.env.PORT || "3000";
-  const customArgs = [...process.argv];
-  
-  // Si el usuario no pasó un puerto, le inyectamos el de Render
-  if (!customArgs.includes("--port")) {
-    customArgs.push("--port", renderPort);
-  }
-  if (!customArgs.includes("--host")) {
-    customArgs.push("--host", "0.0.0.0");
-  }
-
-  void runLegacyCliEntry(customArgs).catch((err) => {
+  void runLegacyCliEntry(process.argv).catch((err) => {
     console.error("[openclaw] CLI failed:", formatUncaughtError(err));
     process.exit(1);
   });
-  // --- FIN DEL CAMBIO ---
 }
