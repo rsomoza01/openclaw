@@ -1,58 +1,37 @@
 #!/usr/bin/env node
+
+// 1. PRIORIDAD MÁXIMA: Parches de red antes que cualquier otra cosa
 import process from "node:process";
+import net from "node:net";
 
-// --- LIMPIEZA TOTAL DE ARGUMENTOS ---
-// Borramos cualquier rastro de configuración previa y forzamos el Host Global
-process.env.HOST = "0.0.0.0";
-process.env.PORT = "3000";
-
-// Reemplazamos los argumentos del proceso para que OpenClaw solo vea estos
-process.argv = [
-  process.argv[0], 
-  process.argv[1], 
-  "--host", "0.0.0.0", 
-  "--port", "3000"
-];
-// ------------------------------------
-
-import { fileURLToPath } from "node:url";
-import net from "node:net"; // <--- Añade este import
-
-// --- EL TRUCO FINAL PARA RENDER ---
-// Forzamos a que cualquier intento de escuchar en '127.0.0.1' se convierta en '0.0.0.0'
+// Forzamos 0.0.0.0 a nivel de socket de Node
 const originalListen = net.Server.prototype.listen;
+// @ts-ignore
 net.Server.prototype.listen = function(...args: any[]) {
-  if (typeof args[1] === 'string' && (args[1] === '127.0.0.1' || args[1] === 'localhost')) {
+  if (typeof args[1] === 'string' && (args[1] === '127.0.0.1' || args[1] === 'localhost' || args[1] === '::1')) {
+    console.log(`[Render-Fix] Interceptado intento de escucha en ${args[1]}. Redirigiendo a 0.0.0.0`);
     args[1] = '0.0.0.0';
   }
   return originalListen.apply(this, args);
 };
 
-// --- FORZADO AGRESIVO ---
-// Esto sobrescribe cualquier configuración interna que busque estas variables
-process.env.OPENCLAW_PORT = "3000"; // Algunos sistemas usan prefijos
+// Forzamos variables de entorno globales
+process.env.HOST = "0.0.0.0";
+process.env.PORT = "3000";
 process.env.OPENCLAW_HOST = "0.0.0.0";
+process.env.OPENCLAW_PORT = "3000";
 
-// También modificamos los argumentos por si acaso
-process.argv.push("--port", "3000", "--host", "0.0.0.0");
-// ------------------------
+// 2. IMPORTS de sistema
+import { fileURLToPath } from "node:url";
 
-// --- BLOQUE DE FORZADO DE PUERTO PARA RENDER ---
-const RENDER_PORT = process.env.PORT || "3000";
-if (!process.argv.includes("--port")) {
-  process.argv.push("--port", RENDER_PORT);
-}
-if (!process.argv.includes("--host")) {
-  process.argv.push("--host", "0.0.0.0");
-}
-// -----------------------------------------------
-
+// 3. IMPORTS del proyecto (después de los parches)
 import { formatUncaughtError } from "./infra/errors.js";
 import { isMainModule } from "./infra/is-main.js";
 import { installUnhandledRejectionHandler } from "./infra/unhandled-rejections.js";
 
 const library = await import("./library.js");
 
+// Re-exports
 export const assertWebChannel = library.assertWebChannel;
 export const applyTemplate = library.applyTemplate;
 export const createDefaultDeps = library.createDefaultDeps;
@@ -94,7 +73,7 @@ export async function runLegacyCliEntry(
   deps?: LegacyCliDeps,
 ): Promise<void> {
   const { installGaxiosFetchCompat, runCli } = deps ?? (await loadLegacyCliDeps());
-  await installGcaughtException(); // Si tenías esto, déjalo
+  // Quitamos la línea de installGcaughtException que daba error
   await installGaxiosFetchCompat();
   await runCli(argv);
 }
@@ -111,16 +90,15 @@ if (isMain) {
     process.exit(1);
   });
 
-  // --- REEMPLAZA ESTA PARTE ---
-  // Ignoramos lo que venga y forzamos estos 4 argumentos
+  // Forzamos los argumentos que el CLI leerá al final
   const forcedArgs = [
-    process.argv[0], // ruta de node
-    process.argv[1], // ruta de index.ts
+    process.argv[0], 
+    process.argv[1], 
     "--port", "3000",
     "--host", "0.0.0.0"
   ];
 
-  console.log("[Render-Fix] Forzando inicio en puerto 3000...");
+  console.log("[Render-Fix] Iniciando OpenClaw forzado en http://0.0.0.0:3000");
 
   void runLegacyCliEntry(forcedArgs).catch((err) => {
     console.error("[openclaw] CLI failed:", formatUncaughtError(err));
