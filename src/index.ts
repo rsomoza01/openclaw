@@ -58,8 +58,6 @@ const isMain = isMainModule({
 });
 
 if (isMain) {
-  // Global error handlers to prevent silent crashes from unhandled rejections/exceptions.
-  // These log the error and exit gracefully instead of crashing without trace.
   installUnhandledRejectionHandler();
 
   process.on("uncaughtException", (error) => {
@@ -67,8 +65,22 @@ if (isMain) {
     process.exit(1);
   });
 
-  void runLegacyCliEntry(process.argv).catch((err) => {
+  // --- CAMBIO AQUÍ ---
+  // Forzamos que los argumentos incluyan el puerto de Render si existe
+  const renderPort = process.env.PORT || "3000";
+  const customArgs = [...process.argv];
+  
+  // Si el usuario no pasó un puerto, le inyectamos el de Render
+  if (!customArgs.includes("--port")) {
+    customArgs.push("--port", renderPort);
+  }
+  if (!customArgs.includes("--host")) {
+    customArgs.push("--host", "0.0.0.0");
+  }
+
+  void runLegacyCliEntry(customArgs).catch((err) => {
     console.error("[openclaw] CLI failed:", formatUncaughtError(err));
     process.exit(1);
   });
+  // --- FIN DEL CAMBIO ---
 }
