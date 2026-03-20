@@ -1,37 +1,52 @@
 #!/usr/bin/env node
 import http from "node:http";
-import httpProxy from "http-proxy"; // Necesitas: npm install http-proxy
 import { spawn } from "node:child_process";
 
 const PORT = process.env.PORT || "3000";
+const TARGET_PORT = "3001"; // OpenClaw escuchará aquí internamente
 
-// 1. Creamos un Proxy que escucha en 0.0.0.0:3000 (Lo que Render quiere)
-const proxy = httpProxy.createProxyServer({ ws: true });
-
+// 1. Servidor Proxy Nativo (Sin librerías externas)
 const server = http.createServer((req, res) => {
-  // Redirige peticiones HTTP normales al puerto interno de OpenClaw
-  proxy.web(req, res, { target: 'http://127.0.0.1:3000' });
+  const options = {
+    hostname: '127.0.0.1',
+    port: TARGET_PORT,
+    path: req.url,
+    method: req.method,
+    headers: req.headers
+  };
+
+  const proxyReq = http.request(options, (proxyRes) => {
+    res.writeHead(proxyRes.statusCode || 200, proxyRes.headers);
+    proxyRes.pipe(res, { end: true });
+  });
+
+  req.pipe(proxyReq, { end: true });
+  proxyReq.on('error', () => {
+    res.writeHead(502);
+    res.end('OpenClaw está arrancando...');
+  });
 });
 
-// Esto es vital para que funcionen los WebSockets de OpenClaw
+// Manejo de WebSockets (Crucial para OpenClaw)
 server.on('upgrade', (req, socket, head) => {
-  proxy.ws(req, socket, head, { target: 'ws://127.0.0.1:3000' });
+  console.log("[Render-Proxy] Upgrade a WebSocket detectado");
+  // Redirección simple de socket
+  const targetSocket = require('node:net').connect(TARGET_PORT, '127.0.0.1', () => {
+    targetSocket.write(head);
+    socket.pipe(targetSocket).pipe(socket);
+  });
+  targetSocket.on('error', () => socket.destroy());
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`[Render-Proxy] Escuchando en 0.0.0.0:${PORT} y redirigiendo a OpenClaw interno...`);
+  console.log(`[Render-Proxy] ¡PUERTO ABIERTO! Escuchando en 0.0.0.0:${PORT}`);
 });
 
-// 2. Lanzamos OpenClaw como un proceso hijo (pero le cambiamos el puerto para que no choque)
-// Si el Proxy usa el 3000, le diremos a OpenClaw que use el 4000 internamente
-console.log("[Render-Proxy] Iniciando OpenClaw original...");
-
-const openclaw = spawn("npx", ["tsx", "index-original.ts", "--port", "3000", "--host", "127.0.0.1"], {
+// 2. Lanzar OpenClaw en el puerto interno
+console.log("[Render-Proxy] Lanzando OpenClaw en puerto interno 3001...");
+const openclaw = spawn("npx", ["tsx", "index-original.ts", "--port", TARGET_PORT, "--host", "127.0.0.1"], {
   stdio: "inherit",
   shell: true
 });
 
-openclaw.on("exit", (code) => {
-  console.log(`OpenClaw terminó con código ${code}`);
-  process.exit(code);
-});
+openclaw.on("exit", (code) => process.exit(code || 0));
